@@ -2,7 +2,7 @@
 //import com.amazonaws.services.s3.AmazonS3Client;
 
 //import software.amazon.awssdk.services.sqs.SqsClient;
-//import software.amazon.awssdk.services.sqs.model.*;
+import software.amazon.awssdk.services.sqs.model.*;
 
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.utils.IoUtils;
+
 
 import java.io.*;
 import java.nio.file.Path;
@@ -31,8 +32,10 @@ public class Manager {
 public static void main(String[] args) {
     AWSHandler awsHandler = new AWSHandler();
     String sqsUrl = awsHandler.createSqs("reviews");
+    String sqsReturnUrl = awsHandler.createSqs("outputs");
     String filePath = "C:\\study\\fifth_semester\\distributed_system_programing\\assignment1\\src\\main\\input1.txt";
-
+    String amid = ""; ///TODO enter real amid from shurki
+    // awsHandler.createEC2Instance("java -jar worker.jar","w1",amid,1);
     try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
         ObjectMapper objectMapper = new ObjectMapper();
         StringBuilder jsonStringBuilder = new StringBuilder();
@@ -62,6 +65,15 @@ public static void main(String[] args) {
     } catch (Exception e) {
         e.printStackTrace();
     }
+    ///TODO wait for workers to do their job
+    try {
+        Thread.sleep(1000);
+    }
+    catch (Exception e){
+
+    }
+    List<Message> messages = awsHandler.readMessage(sqsUrl);
+    System.out.println(messages.get(0).body());
 }
 
 

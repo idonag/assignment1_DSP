@@ -23,6 +23,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Base64;
+import java.util.List;
 
 public class AWSHandler {
     S3Client s3Client;
@@ -33,15 +35,14 @@ public class AWSHandler {
         ec2 = Ec2Client.builder().region(Region.US_EAST_1).build();
         sqsClient = SqsClient.builder().region(Region.US_EAST_1).build();
     }
-    public String createEC2Instance(String name, String amiId,int numOfInstances) {
+    public String createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiId)
                 .instanceType(InstanceType.T1_MICRO)
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
                 .keyName("vockey")
-                /*.userData(Base64.getEncoder().encodeToString(("wget https://s3.console.aws.amazon.com/s3/object/helloworld.idonagler?region=us-east-1&bucketType=general&prefix=HelloWorldTest.jar" +
-                        "java -jar HelloWorldTest.jar").getBytes()))*/
+                .userData(Base64.getEncoder().encodeToString((userData).getBytes()))
                 .build();
 
         RunInstancesResponse response = ec2.runInstances(runRequest);
@@ -126,7 +127,7 @@ public class AWSHandler {
     public String  createSqs(String name){
         sqsClient.createQueue(CreateQueueRequest.builder().queueName(name).build());
         try {
-            Thread.sleep(5000);
+            Thread.sleep(1000);
         }
         catch (Exception e){
             System.out.println("ERROR: "+e.getMessage());
@@ -138,7 +139,11 @@ public class AWSHandler {
         SendMessageRequest sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url).build();
         sqsClient.sendMessage(sendMessageRequest);
     }
-
+    public List<Message> readMessage(String url){
+        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url).build();
+        ReceiveMessageResponse response =  sqsClient.receiveMessage(receiveMessageRequest);
+        return response.messages();
+    }
 
 
 }
