@@ -11,9 +11,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.utils.IoUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,47 +29,41 @@ public class Manager {
 ////
 //    }
 public static void main(String[] args) {
-    // Replace jsonString with your actual JSON data
-    String jsonString = "Your JSON data here";
+    AWSHandler awsHandler = new AWSHandler();
+    String sqsUrl = awsHandler.createSqs("reviews");
+    String filePath = "C:\\study\\fifth_semester\\distributed_system_programing\\assignment1\\src\\main\\input1.txt";
 
-    Map<String, List<String>> reviewsMap = parseJsonFileToMap(Path.of("C:\\study\\fifth_semester\\distributed_system_programing\\assignment1\\src\\main\\input1.txt"));
+    try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        StringBuilder jsonStringBuilder = new StringBuilder();
+//
+        int currentChar;
+        while ((currentChar = br.read()) != -1) {
+            char character = (char) currentChar;
 
-    // Print the parsed data
-    for (Map.Entry<String, List<String>> entry : reviewsMap.entrySet()) {
-        System.out.println("Book Title: " + entry.getKey());
-        System.out.println("Reviews:");
-        for (String review : entry.getValue()) {
-            System.out.println("  - " + review);
-        }
-        System.out.println();
-    }
-}
-    public static Map<String, List<String>> parseJsonFileToMap(Path filePath) {
-        Map<String, List<String>> reviewsMap = new HashMap<>();
+            // Build the JSON string until you find a valid JSON object
+            jsonStringBuilder.append(character);
 
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.readTree(filePath.toFile());
+            try {
+                // Attempt to parse the JSON string
+                JsonNode jsonNode = objectMapper.readTree(jsonStringBuilder.toString());
 
-            // Iterate over each JSON object in the input file
-            for (JsonNode bookNode : rootNode) {
-                String title = bookNode.get("title").asText();
-                List<String> reviews = new ArrayList<>();
-
-                // Iterate over reviews for each book
-                for (JsonNode reviewNode : bookNode.get("reviews")) {
-                    String reviewText = reviewNode.get("text").asText();
-                    reviews.add(reviewText);
+                // If successful, process the JSON object
+                for(JsonNode review : jsonNode.findValue("reviews")){
+                    awsHandler.sendMessage(review.toString(),sqsUrl);
                 }
 
-                reviewsMap.put(title, reviews);
+                // Clear the StringBuilder for the next JSON object
+                jsonStringBuilder.setLength(0);
+            } catch (Exception ignored) {
+                // Not a complete JSON object yet, continue reading
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-
-        return reviewsMap;
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+}
+
 
 
 }

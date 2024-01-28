@@ -12,6 +12,9 @@ import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import com.amazonaws.services.sqs.AmazonSQS;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -120,13 +123,22 @@ public class AWSHandler {
         System.out.println("successfully created a bucket: "+bucketname);
     }
 
-    public void  createSqs(){
-        sqsClient.createQueue(CreateQueueRequest.builder().queueName("input").build());
+    public String  createSqs(String name){
+        sqsClient.createQueue(CreateQueueRequest.builder().queueName(name).build());
+        try {
+            Thread.sleep(5000);
+        }
+        catch (Exception e){
+            System.out.println("ERROR: "+e.getMessage());
+        }
+        String url = sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
+        return url;
+    }
+    public void sendMessage(String m,String url){
+        SendMessageRequest sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url).build();
+        sqsClient.sendMessage(sendMessageRequest);
+    }
 
-    }
-    public void sendMessage(String m){
-        sqsClient.sendMessage(SendMessageRequest.builder().queueUrl("https://sqs.us-east-1.amazonaws.com/340758636980/input\n").messageBody(m).build());
-    }
 
 
 }
