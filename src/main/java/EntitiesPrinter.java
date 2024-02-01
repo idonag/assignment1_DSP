@@ -18,6 +18,7 @@ public class EntitiesPrinter {
     public void printEntities(String review){
 // create an empty Annotation just with the given text
         Annotation document = new Annotation(review);
+
 // run all Annotators on this text
         NERPipeline.annotate(document);
 // these are all the sentences in this document

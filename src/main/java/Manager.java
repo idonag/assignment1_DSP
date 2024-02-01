@@ -34,8 +34,8 @@ public static void main(String[] args) {
     String sqsUrl = awsHandler.createSqs("reviews");
     String sqsReturnUrl = awsHandler.createSqs("outputs");
     String filePath = "C:\\study\\fifth_semester\\distributed_system_programing\\assignment1\\src\\main\\input1.txt";
-    String amid = ""; ///TODO enter real amid from shurki
-    // awsHandler.createEC2Instance("java -jar worker.jar","w1",amid,1);
+    String amid = "ami-0fa175d14f1e42881"; ///TODO enter real amid from shurki
+    int count = 0;
     try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
         ObjectMapper objectMapper = new ObjectMapper();
         StringBuilder jsonStringBuilder = new StringBuilder();
@@ -54,6 +54,7 @@ public static void main(String[] args) {
                 // If successful, process the JSON object
                 for(JsonNode review : jsonNode.findValue("reviews")){
                     awsHandler.sendMessage(review.toString(),sqsUrl);
+                    count++;
                 }
 
                 // Clear the StringBuilder for the next JSON object
@@ -65,6 +66,8 @@ public static void main(String[] args) {
     } catch (Exception e) {
         e.printStackTrace();
     }
+    System.out.println("finish uploading jsons to sqs");
+    awsHandler.createEC2Instance("java -jar worker.jar","w1",amid,1);
     ///TODO wait for workers to do their job
     try {
         Thread.sleep(1000);
@@ -72,8 +75,16 @@ public static void main(String[] args) {
     catch (Exception e){
 
     }
-    List<Message> messages = awsHandler.readMessage(sqsUrl);
-    System.out.println(messages.get(0).body());
+    while (count > 0) {
+        try {
+            List<Message> messages = awsHandler.readMessage(sqsReturnUrl);
+            System.out.println("this is the message received: " + messages.get(0).body());
+            count--;
+        }
+        catch (Exception e){
+
+        }
+    }
 }
 
 

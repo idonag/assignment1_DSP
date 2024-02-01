@@ -38,6 +38,7 @@ public class AWSHandler {
     public String createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiId)
+                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
                 .instanceType(InstanceType.T1_MICRO)
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
@@ -134,6 +135,9 @@ public class AWSHandler {
         }
         String url = sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
         return url;
+    }
+    public String getSqsUrl(String name){
+        return sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
     }
     public void sendMessage(String m,String url){
         SendMessageRequest sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url).build();
