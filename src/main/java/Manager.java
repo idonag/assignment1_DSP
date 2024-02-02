@@ -34,7 +34,7 @@ public static void main(String[] args) {
     String sqsUrl = awsHandler.createSqs("reviews");
     String sqsReturnUrl = awsHandler.createSqs("outputs");
     String filePath = "C:\\study\\fifth_semester\\distributed_system_programing\\assignment1\\src\\main\\input1.txt";
-    String amid = "ami-0fa175d14f1e42881"; ///TODO enter real amid from shurki
+    String amid = "ami-003bedc216572ffb6"; ///TODO enter real amid from shurki
     int count = 0;
     try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
         ObjectMapper objectMapper = new ObjectMapper();

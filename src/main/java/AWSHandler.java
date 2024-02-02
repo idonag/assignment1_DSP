@@ -39,7 +39,7 @@ public class AWSHandler {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiId)
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
-                .instanceType(InstanceType.T1_MICRO)
+                .instanceType(InstanceType.T2_MICRO)
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
                 .keyName("vockey")

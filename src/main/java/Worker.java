@@ -11,10 +11,10 @@ public class Worker {
         //TODO: read the review from the sqs instead of the local path
         // String filePath = "C:\\Users\\noams\\IdeaProjects\\assignment1_DSP\\assignment1_DSP-master\\src\\main\\review.txt";
         System.out.println("running jar");
-        EntitiesPrinter ep = new EntitiesPrinter();;
-
-
+        EntitiesPrinter ep = new EntitiesPrinter();
+        System.out.println("created Entities printer");
         SentimentFinder sf = new SentimentFinder();
+        System.out.println("created Sentiment Finder");
         AWSHandler awsHandler = new AWSHandler();
         System.out.println("try receive a message");
         System.out.println(awsHandler.getSqsUrl("reviews"));

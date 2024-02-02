@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.Properties;
 
 public class EntitiesPrinter {
-    Properties props;
+
     StanfordCoreNLP NERPipeline;
     public EntitiesPrinter(){
-        props = new Properties();
+        Properties props = new Properties();
         props.put("annotators", "tokenize , ssplit, pos, lemma, ner");
         NERPipeline = new StanfordCoreNLP(props);
     }
