@@ -41,14 +41,15 @@ public class Worker {
                     //System.out.println("Review: " + review.findValue("text").asText());
                     // System.out.println("Grade: " + sf.findSentiment(review.findValue("text").asText()));
                     // ep.printEntities(review.findValue("text").asText());
-
-                    awsHandler.sendMessage("" + sf.findSentiment(review.findValue("text").asText()), outputsqsUrl);
+                    int reviewOutput = sf.findSentiment(review.findValue("text").asText());
+                    awsHandler.sendMessage("" + reviewOutput, outputsqsUrl);
 
                     // Clear the StringBuilder for the next JSON object
                     jsonStringBuilder.setLength(0);
                 } catch (Exception ignored) {
                     // Not a complete JSON object yet, continue processing
                 }
+
             }
         }
 
