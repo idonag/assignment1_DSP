@@ -31,10 +31,13 @@ public class Manager {
 //    }
 public static void main(String[] args) {
     AWSHandler awsHandler = new AWSHandler();
-    String sqsUrl = awsHandler.createSqs("reviews");
-    String sqsReturnUrl = awsHandler.createSqs("outputs");
-    String filePath = "C:\\study\\fifth_semester\\distributed_system_programing\\assignment1\\src\\main\\input1.txt";
-    String amid = "ami-003bedc216572ffb6"; ///TODO enter real amid from shurki
+    String amid = "ami-06f533aa95c8c0dad";
+
+//    String sqsUrl = awsHandler.createSqs("reviews");
+//    String sqsReturnUrl = awsHandler.createSqs("outputs");
+    String inputsqsUrl = awsHandler.getSqsUrl("inputs");
+    String outputsqsUrl = awsHandler.getSqsUrl("outputs");
+    String filePath = args[0];
     int count = 0;
     try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -53,7 +56,7 @@ public static void main(String[] args) {
 
                 // If successful, process the JSON object
                 for(JsonNode review : jsonNode.findValue("reviews")){
-                    awsHandler.sendMessage(review.toString(),sqsUrl);
+                    awsHandler.sendMessage(review.toString(),inputsqsUrl);
                     count++;
                 }
 
@@ -67,18 +70,13 @@ public static void main(String[] args) {
         e.printStackTrace();
     }
     System.out.println("finish uploading jsons to sqs");
-    awsHandler.createEC2Instance("java -jar worker.jar","w1",amid,1);
+    awsHandler.createEC2Instance("wget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -jar worker.jar","w",amid,3);
     ///TODO wait for workers to do their job
-    try {
-        Thread.sleep(1000);
-    }
-    catch (Exception e){
-
-    }
     while (count > 0) {
         try {
-            List<Message> messages = awsHandler.readMessage(sqsReturnUrl);
+            List<Message> messages = awsHandler.readMessage(outputsqsUrl);
             System.out.println("this is the message received: " + messages.get(0).body());
+            awsHandler.deleteMessage(outputsqsUrl,messages.get(0).receiptHandle());
             count--;
         }
         catch (Exception e){

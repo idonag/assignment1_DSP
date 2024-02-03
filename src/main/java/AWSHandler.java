@@ -1,3 +1,8 @@
+
+import com.amazonaws.services.cognitoidentity.model.Credentials;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
@@ -31,19 +36,21 @@ public class AWSHandler {
     Ec2Client ec2;
     SqsClient sqsClient;
     public AWSHandler(){
+        //AwsBasicCredentials awsCredentials = AwsBasicCredentials.create("ASIAU6VWMFG2IVMCEMWN", "Z4ixTAWahoik6Qr0vFqrJQQwxCnFsJ4wIze/Q//5");
         s3Client = S3Client.builder().region(Region.US_WEST_2).build();
-        ec2 = Ec2Client.builder().region(Region.US_EAST_1).build();
-        sqsClient = SqsClient.builder().region(Region.US_EAST_1).build();
+        ec2 = Ec2Client.builder().region(Region.US_EAST_1)/*.credentialsProvider(StaticCredentialsProvider.create(awsCredentials))*/.build();
+        sqsClient = SqsClient.builder().region(Region.US_EAST_1)./*credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("ASIAU6VWMFG2LPSBSXVH","txdGAu4i6VClAHfekt+FnvvJLS6pAbSz5nEYlOaq")))*/build();
     }
     public String createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiId)
-                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
-                .instanceType(InstanceType.T2_MICRO)
+
+                /*.iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())*/
+                .instanceType(InstanceType.T2_MEDIUM)
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
-                .keyName("vockey")
                 .userData(Base64.getEncoder().encodeToString((userData).getBytes()))
+                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
                 .build();
 
         RunInstancesResponse response = ec2.runInstances(runRequest);
@@ -147,6 +154,11 @@ public class AWSHandler {
         ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url).build();
         ReceiveMessageResponse response =  sqsClient.receiveMessage(receiveMessageRequest);
         return response.messages();
+    }
+
+    public void deleteMessage(String url,String receipt){
+        DeleteMessageRequest deleteMessageRequest = DeleteMessageRequest.builder().queueUrl(url).receiptHandle(receipt).build();
+        sqsClient.deleteMessage(deleteMessageRequest);
     }
 
 
