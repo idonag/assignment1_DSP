@@ -50,7 +50,7 @@ public class AWSHandler {
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
                 .userData(Base64.getEncoder().encodeToString((userData).getBytes()))
-                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
+                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::169611487111:instance-profile/LabInstanceProfile").build())
                 .build();
 
         RunInstancesResponse response = ec2.runInstances(runRequest);
