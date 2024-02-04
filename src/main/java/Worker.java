@@ -52,7 +52,7 @@ public class Worker {
                         isSarcasm = true;
                     }
                     String responseJson = createResponseJson(revId, isSarcasm);
-                    awsHandler.sendMessage("" + reviewOutput, outputsqsUrl);
+                    awsHandler.sendMessage(responseJson, outputsqsUrl);
 
                     // Clear the StringBuilder for the next JSON object
                     jsonStringBuilder.setLength(0);
