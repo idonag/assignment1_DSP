@@ -7,6 +7,10 @@ import java.io.FileReader;
 import java.util.List;
 
 public class Worker {
+    private static String createResponseJson(String revId, boolean isSarcasm) {
+        // Create a JSON structure for the response
+        return String.format("{\"revId\": \"%s\", \"isSarcasm\": %s}", revId, isSarcasm);
+    }
     public static void main(String[] args) {
         //TODO: read the review from the sqs instead of the local path
         // String filePath = "C:\\Users\\noams\\IdeaProjects\\assignment1_DSP\\assignment1_DSP-master\\src\\main\\review.txt";
@@ -37,15 +41,22 @@ public class Worker {
                     // Attempt to parse the JSON string
                     JsonNode review = objectMapper.readTree(jsonStringBuilder.toString());
                     System.out.println("json has been red- :\n" + review.toString());
+                    String revId = review.findValue("id").asText();
+                    boolean isSarcasm = false;
                     // If successful, process the JSON object
                     //System.out.println("Review: " + review.findValue("text").asText());
                     // System.out.println("Grade: " + sf.findSentiment(review.findValue("text").asText()));
                     // ep.printEntities(review.findValue("text").asText());
                     int reviewOutput = sf.findSentiment(review.findValue("text").asText());
+                    if(Math.abs(reviewOutput - review.findValue("rating").asInt()) >= 3){
+                        isSarcasm = true;
+                    }
+                    String responseJson = createResponseJson(revId, isSarcasm);
                     awsHandler.sendMessage("" + reviewOutput, outputsqsUrl);
 
                     // Clear the StringBuilder for the next JSON object
                     jsonStringBuilder.setLength(0);
+
                 } catch (Exception ignored) {
                     // Not a complete JSON object yet, continue processing
                 }
