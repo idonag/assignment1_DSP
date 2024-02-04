@@ -70,7 +70,7 @@ public static void main(String[] args) {
         e.printStackTrace();
     }
     System.out.println("finish uploading jsons to sqs");
-    awsHandler.createEC2Instance("wget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -jar worker.jar","w",amid,3);
+    awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -jar worker.jar","worker",amid,1);
     ///TODO wait for workers to do their job
     while (count > 0) {
         try {
