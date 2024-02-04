@@ -9,7 +9,7 @@ import java.util.List;
 public class Worker {
     private static String createResponseJson(String revId, boolean isSarcasm) {
         // Create a JSON structure for the response
-        return String.format("{\"revId\": \"%s\", \"isSarcasm\": %s}", revId, isSarcasm);
+        return String.format("{\"id\": \"%s\", \"isSarcasm\": %s}", revId, isSarcasm);
     }
     public static void main(String[] args) {
         //TODO: read the review from the sqs instead of the local path
