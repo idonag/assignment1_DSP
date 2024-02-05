@@ -17,7 +17,7 @@ public class Worker {
             throw new RuntimeException(e);
         }
         // Create a JSON structure for the response
-        return String.format("{\"id\": \"%s\",\"link\": \"%s\",\"rank\": %d,\"entities\": \"%s\"  ,\"isSarcasm\": %s}", revId,link,rank,entitiesJson, isSarcasm);
+        return String.format("{\"id\": \"%s\",\"link\": \"%s\",\"rank\": %d,\"entities\": %s  ,\"isSarcasm\": %s}", revId,link,rank,entitiesJson, isSarcasm);
     }
     public static void main(String[] args) {
         //TODO: read the review from the sqs instead of the local path

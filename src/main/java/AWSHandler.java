@@ -38,7 +38,7 @@ public class AWSHandler {
         ec2 = Ec2Client.builder().region(Region.US_EAST_1)/*.credentialsProvider(StaticCredentialsProvider.create(awsCredentials))*/.build();
         sqsClient = SqsClient.builder().region(Region.US_EAST_1)./*credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("ASIAU6VWMFG2LPSBSXVH","txdGAu4i6VClAHfekt+FnvvJLS6pAbSz5nEYlOaq")))*/build();
     }
-    public String createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
+    public void createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiId)
 
@@ -47,32 +47,31 @@ public class AWSHandler {
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
                 .userData(Base64.getEncoder().encodeToString((userData).getBytes()))
-                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::169611487111:instance-profile/LabInstanceProfile").build())
+                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
                 .build();
 
         RunInstancesResponse response = ec2.runInstances(runRequest);
-        String instanceId = response.instances().get(0).instanceId();
-        Tag tag = Tag.builder()
-                .key("Name")
-                .value(name)
-                .build();
+        int i =0;
+        for (Instance instance: response.instances()){
+            Tag tag = Tag.builder()
+                    .key("Name")
+                    .value(name + i)
+                    .build();
 
-        CreateTagsRequest tagRequest = CreateTagsRequest.builder()
-                .resources(instanceId)
-                .tags(tag)
-                .build();
+            CreateTagsRequest tagRequest = CreateTagsRequest.builder()
+                    .resources(instance.instanceId())
+                    .tags(tag)
+                    .build();
+            try {
+                ec2.createTags(tagRequest);
+                System.out.printf("Successfully started EC2 Instance %s based on AMI %s", instance.instanceId(), amiId);
+            } catch (Ec2Exception e) {
+                System.err.println(e.awsErrorDetails().errorMessage());
+                System.exit(1);
+            }
+            i++;
 
-        try {
-            ec2.createTags(tagRequest);
-            System.out.printf("Successfully started EC2 Instance %s based on AMI %s", instanceId, amiId);
-            return instanceId;
-
-        } catch (Ec2Exception e) {
-            System.err.println(e.awsErrorDetails().errorMessage());
-            System.exit(1);
         }
-
-        return "";
     }
     public void uploadToBucket(String bucketname,String key ,String path){
         Path filePath = Paths.get(path);
@@ -151,7 +150,7 @@ public class AWSHandler {
         sqsClient.sendMessage(sendMessageRequest);
     }
     public List<Message> readMessage(String url){
-        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url)./*visibilityTimeout(360).*/build();
+        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url).visibilityTimeout(360).build();
         ReceiveMessageResponse response =  sqsClient.receiveMessage(receiveMessageRequest);
         return response.messages();
     }
@@ -161,5 +160,33 @@ public class AWSHandler {
         sqsClient.deleteMessage(deleteMessageRequest);
     }
 
+    public boolean isInstanceWithTagExists(String tagName) {
+        // Specify the filter to search for instances with the specified tag
+        Filter tagFilter = Filter.builder()
+                .name("tag:Name")
+                .values(tagName)
+                .build();
+
+        // Create a describe instances request with the tag filter
+        DescribeInstancesRequest describeInstancesRequest = DescribeInstancesRequest.builder()
+                .filters(tagFilter)
+                .build();
+
+        // Send the describe instances request and get the response
+        DescribeInstancesResponse describeInstancesResponse = ec2.describeInstances(describeInstancesRequest);
+
+        // Check if any instances are found
+        for (Reservation reservation : describeInstancesResponse.reservations()) {
+            for (Instance instance : reservation.instances()) {
+                for (Tag tag : instance.tags()) {
+                    if (tagName.equals(tag.value())) {
+                        return true; // Found an instance with the specified tag
+                    }
+                }
+            }
+        }
+
+        return false; // No instance with the specified tag found
+    }
 
 }

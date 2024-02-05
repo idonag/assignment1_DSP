@@ -9,7 +9,7 @@ public class Local {
         else {
             filePath = args[0];
         }
-        String amid = "ami-029abde7a909e7f6e";
+        String amid = "ami-06f533aa95c8c0dad";
         AWSHandler awsHandler = new AWSHandler();
         awsHandler.createSqs("files");
         String filesUrlSqs = awsHandler.getSqsUrl("files");
@@ -18,11 +18,13 @@ public class Local {
         //TODO implement how to get the url from s3/from user
         //TODO check if manager exist
         awsHandler.sendMessage(filePath,filesUrlSqs);
-//        awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/manager.jar\n" +
-//                "java -Xmx2g -jar manager.jar\n","manager",amid,1);
-//        if(terminate){
-//            awsHandler.sendMessage("t",filesUrlSqs);
-//        }
+        if(!awsHandler.isInstanceWithTagExists("manager")) {
+            awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/manager.jar\n" +
+                    "java -Xmx2g -jar manager.jar\n", "manager", amid, 1);
+        }
+        if(terminate){
+            awsHandler.sendMessage("t",filesUrlSqs);
+        }
 
     }
     //java -jar manager.jar input1.txt

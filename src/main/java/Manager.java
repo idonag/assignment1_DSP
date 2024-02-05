@@ -32,7 +32,18 @@ public static void main(String[] args) {
     String outputsqsUrl = awsHandler.getSqsUrl("outputs");
     String fileUrl = "";
     while (true) {
-        fileUrl = awsHandler.readMessage(filessqsUrl).get(0).body();
+        List<Message> files = awsHandler.readMessage(filessqsUrl);
+        if(files.isEmpty()){
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            continue;
+        }
+        Message fileM = files.get(0);
+        fileUrl = fileM.body();
+        awsHandler.deleteMessage(filessqsUrl,fileM.receiptHandle());
         if(fileUrl.equals("t")){
             break;
         }
@@ -69,23 +80,24 @@ public static void main(String[] args) {
             e.printStackTrace();
         }
         System.out.println("finish uploading jsons to sqs");
-        awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, 1);
+        awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, 6);
 
         ///TODO wait for workers to do their job
         List<JsonNode> outputs = new ArrayList<>();
         while (count > 0) {
             try {
                 List<Message> messages = awsHandler.readMessage(outputsqsUrl);
+                System.out.println(count);
                 outputs.add(objectMapper.readTree(messages.get(0).body()));
                 awsHandler.deleteMessage(outputsqsUrl, messages.get(0).receiptHandle());
                 count--;
             } catch (Exception e) {
-
+                System.out.println("ERROR: "+e.getMessage());
             }
         }
         String html = generateHtml(outputs);
         writeToFile("outputs.html", html);
-        awsHandler.uploadToBucket("workerido", "htmlfile", "outputs.html");
+        awsHandler.uploadToBucket("workerbucketido", "htmlfile.html", "outputs.html");
     }
 }
 private static String generateHtml(List<JsonNode> outputs) {
@@ -104,8 +116,8 @@ private static String generateHtml(List<JsonNode> outputs) {
         String lineColor = colors[rank];
 
         // Create HTML line
-        htmlBuilder.append(String.format("<div class='line' style='background-color: %s;'>id: %s, link: %s, rank: %d, isSarcasm: %s</div>\n",
-                lineColor, json.findValue("revId"), json.findValue("link"), rank, json.findValue("isSarcasm")));
+        htmlBuilder.append(String.format("<div class='line' style='color: %s;'>id: %s, link: %s, rank: %d,entities: %s ,isSarcasm: %s</div>\n",
+                lineColor, json.findValue("id"), json.findValue("link"), rank, json.findValue("entities"),json.findValue("isSarcasm")));
     }
 
     htmlBuilder.append("</body>\n</html>");
