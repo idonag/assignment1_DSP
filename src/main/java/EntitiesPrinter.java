@@ -15,7 +15,7 @@ public class EntitiesPrinter {
         props.put("annotators", "tokenize , ssplit, pos, lemma, ner");
         NERPipeline = new StanfordCoreNLP(props);
     }
-    public void printEntities(String review){
+    public void printEntities(String review,List<String> e){
 // create an empty Annotation just with the given text
         Annotation document = new Annotation(review);
 
@@ -33,6 +33,7 @@ public class EntitiesPrinter {
 // this is the NER label of the token
                 String ne = token.get(CoreAnnotations.NamedEntityTagAnnotation.class);
                 System.out.println("\t-" + word + ":" + ne);
+                e.add(word);
             }
         }
     }

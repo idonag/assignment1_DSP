@@ -20,10 +20,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,7 +34,7 @@ public class AWSHandler {
     SqsClient sqsClient;
     public AWSHandler(){
         //AwsBasicCredentials awsCredentials = AwsBasicCredentials.create("ASIAU6VWMFG2IVMCEMWN", "Z4ixTAWahoik6Qr0vFqrJQQwxCnFsJ4wIze/Q//5");
-        s3Client = S3Client.builder().region(Region.US_WEST_2).build();
+        s3Client = S3Client.builder().region(Region.US_EAST_1).build();
         ec2 = Ec2Client.builder().region(Region.US_EAST_1)/*.credentialsProvider(StaticCredentialsProvider.create(awsCredentials))*/.build();
         sqsClient = SqsClient.builder().region(Region.US_EAST_1)./*credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("ASIAU6VWMFG2LPSBSXVH","txdGAu4i6VClAHfekt+FnvvJLS6pAbSz5nEYlOaq")))*/build();
     }
@@ -90,30 +87,29 @@ public class AWSHandler {
             System.out.println("ERROR "+e.getMessage());
         }
     }
-    public void getObjectBytes(String bucketName, String keyName, String path) {
+    public String getObjectFromBucket(String bucketName, String keyName, String path) {
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(keyName)
+                .build();
+        ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
+        String fileName = new File(keyName).getName();
+        BufferedOutputStream outputStream = null;
         try {
-            GetObjectRequest objectRequest = GetObjectRequest
-                    .builder()
-                    .key(keyName)
-                    .bucket(bucketName)
-                    .build();
+            outputStream = new BufferedOutputStream(new FileOutputStream(fileName));
 
-            ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(objectRequest);
-            byte[] data = objectBytes.asByteArray();
+        byte[] buffer = new byte[4096];
+        int bytesRead = -1;
 
-            // Write the data to a local file.
-            File myFile = new File(path);
-            OutputStream os = new FileOutputStream(myFile);
-            os.write(data);
-            System.out.println("Successfully obtained bytes from an S3 object");
-            os.close();
-
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        } catch (S3Exception e) {
-            System.err.println(e.awsErrorDetails().errorMessage());
-            System.exit(1);
+        while ((bytesRead = response.read(buffer)) !=  -1) {
+            outputStream.write(buffer, 0, bytesRead);
         }
+        response.close();
+        outputStream.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return fileName;
     }
     public void createBucket(String bucketname){
         s3Client.createBucket(CreateBucketRequest
@@ -130,6 +126,10 @@ public class AWSHandler {
             throw new RuntimeException(e);
         }
         System.out.println("successfully created a bucket: "+bucketname);
+    }
+    public String getFileUrl(String bucketname,String key){
+
+        return "";
     }
 
     public String  createSqs(String name){
@@ -151,7 +151,7 @@ public class AWSHandler {
         sqsClient.sendMessage(sendMessageRequest);
     }
     public List<Message> readMessage(String url){
-        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url).build();
+        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url)./*visibilityTimeout(360).*/build();
         ReceiveMessageResponse response =  sqsClient.receiveMessage(receiveMessageRequest);
         return response.messages();
     }
