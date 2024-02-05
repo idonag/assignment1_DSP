@@ -116,8 +116,8 @@ private static String generateHtml(List<JsonNode> outputs) {
         String lineColor = colors[rank];
 
         // Create HTML line
-        htmlBuilder.append(String.format("<div class='line' style='color: %s;'>id: %s, link: %s, rank: %d,entities: %s ,isSarcasm: %s</div>\n",
-                lineColor, json.findValue("id"), json.findValue("link"), rank, json.findValue("entities"),json.findValue("isSarcasm")));
+        htmlBuilder.append(String.format("<div class='line' style='color: %s;'>id: %s, link: <a href='%s' target='_blank'>%s</a>, rank: %d, entities: %s, isSarcasm: %s</div>\n",
+                lineColor, json.findValue("id"), json.findValue("link"), json.findValue("link"), rank, json.findValue("entities"), json.findValue("isSarcasm")));
     }
 
     htmlBuilder.append("</body>\n</html>");
