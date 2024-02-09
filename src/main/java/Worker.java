@@ -35,6 +35,9 @@ public class Worker {
         System.out.println(inputsqsUrl);
         while(true) {
             List<Message> messages = awsHandler.readMessage(inputsqsUrl);
+            if(messages.isEmpty()){
+                continue;
+            }
             Message m = messages.get(0);
             String jsonMessage = m.body();
             ObjectMapper objectMapper = new ObjectMapper();

@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class AWSHandler {
     S3Client s3Client;
@@ -38,7 +39,7 @@ public class AWSHandler {
         ec2 = Ec2Client.builder().region(Region.US_EAST_1)/*.credentialsProvider(StaticCredentialsProvider.create(awsCredentials))*/.build();
         sqsClient = SqsClient.builder().region(Region.US_EAST_1)./*credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("ASIAU6VWMFG2LPSBSXVH","txdGAu4i6VClAHfekt+FnvvJLS6pAbSz5nEYlOaq")))*/build();
     }
-    public void createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
+    public List<String> createEC2Instance(String userData,String name, String amiId,int numOfInstances) {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiId)
 
@@ -72,6 +73,7 @@ public class AWSHandler {
             i++;
 
         }
+        return response.instances().stream().map(Instance::instanceId).collect(Collectors.toList());
     }
     public void uploadToBucket(String bucketname,String key ,String path){
         Path filePath = Paths.get(path);
@@ -167,6 +169,7 @@ public class AWSHandler {
                 .values(tagName)
                 .build();
 
+
         // Create a describe instances request with the tag filter
         DescribeInstancesRequest describeInstancesRequest = DescribeInstancesRequest.builder()
                 .filters(tagFilter)
@@ -179,7 +182,7 @@ public class AWSHandler {
         for (Reservation reservation : describeInstancesResponse.reservations()) {
             for (Instance instance : reservation.instances()) {
                 for (Tag tag : instance.tags()) {
-                    if (tagName.equals(tag.value())) {
+                    if (tagName.equals(tag.value()) && "running".equals(instance.state().nameAsString())) {
                         return true; // Found an instance with the specified tag
                     }
                 }
@@ -187,6 +190,11 @@ public class AWSHandler {
         }
 
         return false; // No instance with the specified tag found
+    }
+
+    public void terminateInstances(List<String> idList){
+        TerminateInstancesRequest terminateInstancesRequest = TerminateInstancesRequest.builder().instanceIds(idList).build();
+        ec2.terminateInstances(terminateInstancesRequest);
     }
 
 }

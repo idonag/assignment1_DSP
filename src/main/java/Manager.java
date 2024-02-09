@@ -18,19 +18,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Manager {
 
 public static void main(String[] args) {
     AWSHandler awsHandler = new AWSHandler();
-    String amid = "ami-06f533aa95c8c0dad";
-
+    String amid = "ami-0628812371fda9787";
+    List<String> workersId = new ArrayList<>();
 //    String sqsUrl = awsHandler.createSqs("reviews");
 //    String sqsReturnUrl = awsHandler.createSqs("outputs");
     String filessqsUrl = awsHandler.getSqsUrl("files");
     String inputsqsUrl = awsHandler.getSqsUrl("inputs");
     String outputsqsUrl = awsHandler.getSqsUrl("outputs");
-    String fileUrl = "";
+    String fullMessage = "";
+
     while (true) {
         List<Message> files = awsHandler.readMessage(filessqsUrl);
         if(files.isEmpty()){
@@ -42,12 +45,18 @@ public static void main(String[] args) {
             continue;
         }
         Message fileM = files.get(0);
-        fileUrl = fileM.body();
+        fullMessage = fileM.body();
         awsHandler.deleteMessage(filessqsUrl,fileM.receiptHandle());
-        if(fileUrl.equals("t")){
+        if(fullMessage.equals("t")){
+            if(!workersId.isEmpty()) {
+                awsHandler.terminateInstances(workersId);
+            }
             break;
         }
-        String filePath = awsHandler.getObjectFromBucket("workerbucketido","input1.txt",fileUrl);
+        String key = extractKey(fullMessage);
+        String localId = extractId(fullMessage);
+        String fileUrl = extractUrl(fullMessage);
+        String filePath = awsHandler.getObjectFromBucket("workerbucketido",key,fileUrl);
         int count = 0;
         ObjectMapper objectMapper = new ObjectMapper();
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
@@ -80,9 +89,11 @@ public static void main(String[] args) {
             e.printStackTrace();
         }
         System.out.println("finish uploading jsons to sqs");
-        awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, 6);
-
-        ///TODO wait for workers to do their job
+        int numOfInstances = Math.min(8,count/30);
+        ///TODO check if exists.
+        if(!awsHandler.isInstanceWithTagExists("worker0")) {
+            workersId = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, numOfInstances);
+        }
         List<JsonNode> outputs = new ArrayList<>();
         while (count > 0) {
             try {
@@ -97,10 +108,29 @@ public static void main(String[] args) {
         }
         String html = generateHtml(outputs);
         writeToFile("outputs.html", html);
-        awsHandler.uploadToBucket("workerbucketido", "htmlfile.html", "outputs.html");
+        awsHandler.uploadToBucket("workerbucketido", localId+":htmlfile.html", "outputs.html");
     }
 }
-private static String generateHtml(List<JsonNode> outputs) {
+
+    private static String extractUrl(String fullMessage) {
+        for(int i =0; i < fullMessage.length();i++){
+            if (fullMessage.charAt(i) == ':'){
+                return fullMessage.substring(i+1);
+            }
+        }
+        return "";
+    }
+
+    private static String extractId(String fullMessage) {
+        for(int i =0; i < fullMessage.length();i++){
+            if (fullMessage.charAt(i) == ':'){
+                return fullMessage.substring(0,i);
+            }
+        }
+        return "";
+    }
+
+    private static String generateHtml(List<JsonNode> outputs) {
     String[] colors ={"black","darkred","red","black","lightgreen","darkgreen"};
     StringBuilder htmlBuilder = new StringBuilder();
     htmlBuilder.append("<html>\n<head>\n<style>\n");
@@ -116,7 +146,7 @@ private static String generateHtml(List<JsonNode> outputs) {
         String lineColor = colors[rank];
 
         // Create HTML line
-        htmlBuilder.append(String.format("<div class='line' style='color: %s;'>id: %s, link: <a href='%s' target='_blank'>%s</a>, rank: %d, entities: %s, isSarcasm: %s</div>\n",
+        htmlBuilder.append(String.format("<div class='line' style='color: %s;'>id: %s, link: <a href=%s target='_blank'>%s</a>, rank: %d, entities: %s, <b>isSarcasm: %s</b></div>\n",
                 lineColor, json.findValue("id"), json.findValue("link"), json.findValue("link"), rank, json.findValue("entities"), json.findValue("isSarcasm")));
     }
 
@@ -130,6 +160,15 @@ private static void writeToFile(String fileName, String content) {
     } catch (IOException e) {
         e.printStackTrace();
     }
+}
+
+private static String extractKey(String url){
+    for(int i = url.length()-1;i>=0;i--){
+        if(url.charAt(i) == '/'){
+            return url.substring(i+1);
+        }
+    }
+    return "";
 }
 }
 
