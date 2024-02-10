@@ -129,8 +129,12 @@ public class AWSHandler {
         System.out.println("successfully created a bucket: "+bucketname);
     }
     public String getFileUrl(String bucketname,String key){
+        String fileUrl = s3Client.utilities().getUrl(GetUrlRequest.builder()
+                .bucket(bucketname)
+                .key(key)
+                .build()).toExternalForm();
 
-        return "";
+        return fileUrl;
     }
 
     public String  createSqs(String name){
@@ -151,8 +155,8 @@ public class AWSHandler {
         SendMessageRequest sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url).build();
         sqsClient.sendMessage(sendMessageRequest);
     }
-    public List<Message> readMessage(String url){
-        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url).visibilityTimeout(360).build();
+    public List<Message> readMessage(String url,int visibilityTimeOut){
+        ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder().queueUrl(url).visibilityTimeout(visibilityTimeOut).build();
         ReceiveMessageResponse response =  sqsClient.receiveMessage(receiveMessageRequest);
         return response.messages();
     }

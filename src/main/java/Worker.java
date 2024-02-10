@@ -34,7 +34,7 @@ public class Worker {
         System.out.println("try receive a message");
         System.out.println(inputsqsUrl);
         while(true) {
-            List<Message> messages = awsHandler.readMessage(inputsqsUrl);
+            List<Message> messages = awsHandler.readMessage(inputsqsUrl,360);
             if(messages.isEmpty()){
                 continue;
             }

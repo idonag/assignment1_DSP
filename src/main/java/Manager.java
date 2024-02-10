@@ -2,6 +2,7 @@
 //import com.amazonaws.services.s3.AmazonS3Client;
 
 //import software.amazon.awssdk.services.sqs.SqsClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import software.amazon.awssdk.services.sqs.model.*;
 
 
@@ -32,19 +33,21 @@ public static void main(String[] args) {
     String filessqsUrl = awsHandler.getSqsUrl("files");
     String inputsqsUrl = awsHandler.getSqsUrl("inputs");
     String outputsqsUrl = awsHandler.getSqsUrl("outputs");
+    String answersUrlSqs = awsHandler.getSqsUrl("answers");
+
     String fullMessage = "";
 
     while (true) {
-        List<Message> files = awsHandler.readMessage(filessqsUrl);
+        List<Message> files = awsHandler.readMessage(filessqsUrl,0);
         if(files.isEmpty()){
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
             }
             continue;
         }
         Message fileM = files.get(0);
+        System.out.println(fileM.body());
         fullMessage = fileM.body();
         awsHandler.deleteMessage(filessqsUrl,fileM.receiptHandle());
         if(fullMessage.equals("t")){
@@ -53,12 +56,20 @@ public static void main(String[] args) {
             }
             break;
         }
-        String key = extractKey(fullMessage);
-        String localId = extractId(fullMessage);
-        String fileUrl = extractUrl(fullMessage);
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonLocalMessage = null;
+        try {
+            jsonLocalMessage = objectMapper.readTree(fullMessage);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+        String key = extractKey(jsonLocalMessage.findValue("input file").asText());
+        String localId = jsonLocalMessage.findValue("localId").asText();
+        String fileUrl = extractUrl(jsonLocalMessage.findValue("input file").asText());
+        String outputFile = jsonLocalMessage.findValue("output file").asText();
         String filePath = awsHandler.getObjectFromBucket("workerbucketido",key,fileUrl);
         int count = 0;
-        ObjectMapper objectMapper = new ObjectMapper();
+
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             StringBuilder jsonStringBuilder = new StringBuilder();
 //
@@ -97,7 +108,7 @@ public static void main(String[] args) {
         List<JsonNode> outputs = new ArrayList<>();
         while (count > 0) {
             try {
-                List<Message> messages = awsHandler.readMessage(outputsqsUrl);
+                List<Message> messages = awsHandler.readMessage(outputsqsUrl,1);
                 System.out.println(count);
                 outputs.add(objectMapper.readTree(messages.get(0).body()));
                 awsHandler.deleteMessage(outputsqsUrl, messages.get(0).receiptHandle());
@@ -106,11 +117,26 @@ public static void main(String[] args) {
                 System.out.println("ERROR: "+e.getMessage());
             }
         }
-        String html = generateHtml(outputs);
-        writeToFile("outputs.html", html);
-        awsHandler.uploadToBucket("workerbucketido", localId+":htmlfile.html", "outputs.html");
+        String summary = sumToFile(outputs);
+        writeToFile(outputFile, summary);
+        awsHandler.uploadToBucket("workerbucketido", localId+":"+outputFile, outputFile);
+        String summaryFilePath = awsHandler.getFileUrl("workerbucketido",localId+":"+outputFile);
+        String json = String.format("{\"localId\":\"%s\" ,\"output file\":\"%s\" ,\"path\":\"%s\"}",localId,localId+":"+outputFile,summaryFilePath);
+        awsHandler.sendMessage(json,answersUrlSqs);
     }
 }
+
+    private static String sumToFile(List<JsonNode> outputs) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (JsonNode node : outputs) {
+            stringBuilder.append(node.toString()).append("\n");
+        }
+        // Remove the last newline character if there are elements in the list
+        if (!outputs.isEmpty()) {
+            stringBuilder.deleteCharAt(stringBuilder.length() - 1);
+        }
+        return stringBuilder.toString();
+    }
 
     private static String extractUrl(String fullMessage) {
         for(int i =0; i < fullMessage.length();i++){
@@ -130,29 +156,7 @@ public static void main(String[] args) {
         return "";
     }
 
-    private static String generateHtml(List<JsonNode> outputs) {
-    String[] colors ={"black","darkred","red","black","lightgreen","darkgreen"};
-    StringBuilder htmlBuilder = new StringBuilder();
-    htmlBuilder.append("<html>\n<head>\n<style>\n");
-    htmlBuilder.append("body { font-family: Arial, sans-serif; }\n");
-    htmlBuilder.append(".line { padding: 10px; margin: 5px; }\n");
-    htmlBuilder.append("</style>\n</head>\n<body>\n");
 
-    for (JsonNode json : outputs) {
-        // Parse JSON and extract values
-        int rank = json.findValue("rank").asInt();
-
-        // Determine line color based on rank
-        String lineColor = colors[rank];
-
-        // Create HTML line
-        htmlBuilder.append(String.format("<div class='line' style='color: %s;'>id: %s, link: <a href=%s target='_blank'>%s</a>, rank: %d, entities: %s, <b>isSarcasm: %s</b></div>\n",
-                lineColor, json.findValue("id"), json.findValue("link"), json.findValue("link"), rank, json.findValue("entities"), json.findValue("isSarcasm")));
-    }
-
-    htmlBuilder.append("</body>\n</html>");
-    return htmlBuilder.toString();
-}
 private static void writeToFile(String fileName, String content) {
     try (FileWriter writer = new FileWriter(fileName)) {
         writer.write(content);
