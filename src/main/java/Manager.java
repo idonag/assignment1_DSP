@@ -26,7 +26,7 @@ public class Manager {
 
 public static void main(String[] args) {
     AWSHandler awsHandler = new AWSHandler();
-    String amid = "ami-0628812371fda9787";
+    String amid = "ami-029abde7a909e7f6e";
     List<String> workersId = new ArrayList<>();
 //    String sqsUrl = awsHandler.createSqs("reviews");
 //    String sqsReturnUrl = awsHandler.createSqs("outputs");
@@ -67,7 +67,8 @@ public static void main(String[] args) {
         String localId = jsonLocalMessage.findValue("localId").asText();
         String fileUrl = extractUrl(jsonLocalMessage.findValue("input file").asText());
         String outputFile = jsonLocalMessage.findValue("output file").asText();
-        String filePath = awsHandler.getObjectFromBucket("workerbucketido",key,fileUrl);
+        int reviewsPerWorker = jsonLocalMessage.findValue("n").asInt();
+        String filePath = awsHandler.getObjectFromBucket("worker-bucket-dsp",key,fileUrl);
         int count = 0;
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
@@ -100,10 +101,11 @@ public static void main(String[] args) {
             e.printStackTrace();
         }
         System.out.println("finish uploading jsons to sqs");
-        int numOfInstances = Math.min(8,count/30);
+        int numOfInstancesRequested = count % reviewsPerWorker == 0 ? count/reviewsPerWorker : count/reviewsPerWorker + 1;
+        int numOfInstances = Math.min(8,numOfInstancesRequested);
         ///TODO check if exists.
         if(!awsHandler.isInstanceWithTagExists("worker0")) {
-            workersId = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, numOfInstances);
+            workersId = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, numOfInstances);
         }
         List<JsonNode> outputs = new ArrayList<>();
         while (count > 0) {
@@ -119,8 +121,8 @@ public static void main(String[] args) {
         }
         String summary = sumToFile(outputs);
         writeToFile(outputFile, summary);
-        awsHandler.uploadToBucket("workerbucketido", localId+":"+outputFile, outputFile);
-        String summaryFilePath = awsHandler.getFileUrl("workerbucketido",localId+":"+outputFile);
+        awsHandler.uploadToBucket("worker-bucket-dsp", localId+":"+outputFile, outputFile);
+        String summaryFilePath = awsHandler.getFileUrl("worker-bucket-dsp",localId+":"+outputFile);
         String json = String.format("{\"localId\":\"%s\" ,\"output file\":\"%s\" ,\"path\":\"%s\"}",localId,localId+":"+outputFile,summaryFilePath);
         awsHandler.sendMessage(json,answersUrlSqs);
     }

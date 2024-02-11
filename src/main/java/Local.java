@@ -13,14 +13,14 @@ import java.util.UUID;
 
 public class Local {
     public static void main(String[] args) {
-        String amid = "ami-00e95a9222311e8ed";
+        String amid = "ami-029abde7a909e7f6e";
         AWSHandler awsHandler = new AWSHandler();
-       // initManager(awsHandler,amid);
+        initManager(awsHandler,amid);
         awsHandler.createSqs("files");
         String filesUrlSqs = awsHandler.getSqsUrl("files");
         awsHandler.createSqs("inputs");
         awsHandler.createSqs("outputs");
-        //awsHandler.createSqs("answers");
+        awsHandler.createSqs("answers");
         String answersUrlSqs = awsHandler.getSqsUrl("answers");
         //generate unique id
         UUID uniqueID = UUID.randomUUID();
@@ -53,7 +53,7 @@ public class Local {
     }
     public static void initManager(AWSHandler awsHandler,String amid){
         if(!awsHandler.isInstanceWithTagExists("manager0")) {
-            awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://workerbucketido.s3.amazonaws.com/manager.jar\n" +
+            awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/manager.jar\n" +
                     "java -Xmx2g -jar manager.jar\n", "manager", amid, 1);
         }
     }
@@ -90,10 +90,10 @@ public class Local {
                 if(jsonReceived.findValue("localId").asText().equals(localId)){
                     String outputFile = jsonReceived.findValue("output file").asText();
                     awsHandler.deleteMessage(answersUrlSqs,message.receiptHandle());
-                    String summaryFilePath =  awsHandler.getObjectFromBucket("workerbucketido",jsonReceived.findValue("output file").asText(),jsonReceived.findValue("path").asText());
+                    String summaryFilePath =  awsHandler.getObjectFromBucket("worker-bucket-dsp",jsonReceived.findValue("output file").asText(),jsonReceived.findValue("path").asText());
                     List<JsonNode> results = parseToJSonList(summaryFilePath);
                     String htmlContent = generateHtml(results);
-                    writeToFile(outputFile+".html",htmlContent);
+                    writeToFile(extractFilenameAfterColon(outputFile+".html"),htmlContent);
                     numOfFiles--;
                 }
             }
@@ -111,13 +111,15 @@ public class Local {
         ObjectMapper objectMapper = new ObjectMapper();
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             StringBuilder jsonStringBuilder = new StringBuilder();
-//
-            int currentChar;
-            while ((currentChar = br.read()) != -1) {
-                char character = (char) currentChar;
+            //int currentChar;
+            String line;
+            //while ((currentChar = br.read()) != -1) {
+            while ((line = br.readLine()) != null) {
+                //char character = (char) currentChar;
+                jsonStringBuilder.append(line.trim());
 
                 // Build the JSON string until you find a valid JSON object
-                jsonStringBuilder.append(character);
+                //jsonStringBuilder.append(character);
 
                 try {
                     // Attempt to parse the JSON string
@@ -143,5 +145,15 @@ public class Local {
             e.printStackTrace();
         }
     }
-    //java -jar manager.jar input1.txt
+
+    public static String extractFilenameAfterColon(String filename) {
+        int colonIndex = filename.indexOf(':'); // Find the index of the colon
+        if (colonIndex != -1 && colonIndex < filename.length() - 1) {
+            // If colon exists and there's content after it
+            return filename.substring(colonIndex + 1); // Extract the substring after colon
+        } else {
+            // If colon doesn't exist or it's at the end of the string
+            return ""; // Return an empty string or handle error accordingly
+        }
+    }
 }
