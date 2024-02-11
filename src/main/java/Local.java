@@ -14,10 +14,11 @@ import java.util.UUID;
 public class Local {
     public static void main(String[] args) {
         String amid = "ami-029abde7a909e7f6e";
+        String messageGroupId = "files";
         AWSHandler awsHandler = new AWSHandler();
-        initManager(awsHandler,amid);
-        awsHandler.createSqs("files");
-        String filesUrlSqs = awsHandler.getSqsUrl("files");
+        awsHandler.createSqs("files.fifo");
+        String filesUrlSqs = awsHandler.getSqsUrl("files.fifo");
+        initManager(awsHandler,amid,filesUrlSqs,messageGroupId);
         awsHandler.createSqs("inputs");
         awsHandler.createSqs("outputs");
         awsHandler.createSqs("answers");
@@ -38,23 +39,19 @@ public class Local {
         }
         for(int i = 0; i < numOFfiles; i++){
             String json = String.format("{\"localId\":\"%s\" ,\"input file\":\"%s\" ,\"output file\":\"%s\" ,\"n\":%d}",uniqueID,args[i],args[numOFfiles+i],reviewsPerWorker);
-            awsHandler.sendMessage(json,filesUrlSqs);
+            awsHandler.sendMessage(json,filesUrlSqs,messageGroupId,""+uniqueID+i);
         }
         if(args[args.length-1].equals("t")){
-            terminate = true;
+            //terminate = true;
+            awsHandler.sendMessage("t",filesUrlSqs,messageGroupId,"t");
         }
         waitForAnswer(numOFfiles,awsHandler,answersUrlSqs,uniqueID.toString());
-
-/*        if(terminate){
-            awsHandler.sendMessage("t",filesUrlSqs);
-        }*/
-
-
     }
-    public static void initManager(AWSHandler awsHandler,String amid){
+    public static void initManager(AWSHandler awsHandler,String amid,String filesUrlSqs,String messageGroupId){
         if(!awsHandler.isInstanceWithTagExists("manager0")) {
-            awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/manager.jar\n" +
+            List<String> ids = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/manager.jar\n" +
                     "java -Xmx2g -jar manager.jar\n", "manager", amid, 1);
+            awsHandler.sendMessage("managerID:" + ids.get(0),filesUrlSqs,messageGroupId,"managerID");
         }
     }
     private static String generateHtml(List<JsonNode> outputs) {

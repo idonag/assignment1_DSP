@@ -1,36 +1,29 @@
-
-//import com.amazonaws.services.s3.AmazonS3Client;
-
-//import software.amazon.awssdk.services.sqs.SqsClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import software.amazon.awssdk.services.sqs.model.*;
 
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.S3Object;
-import software.amazon.awssdk.utils.IoUtils;
-
 
 import java.io.*;
-import java.nio.file.Path;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import software.amazon.awssdk.services.ec2.model.TerminateInstancesRequest;
+import software.amazon.awssdk.services.ec2.model.TerminateInstancesResponse;
+import software.amazon.awssdk.services.ec2.model.Ec2Exception;
+import software.amazon.awssdk.services.ec2.Ec2Client;
 
 public class Manager {
 
 public static void main(String[] args) {
     AWSHandler awsHandler = new AWSHandler();
+    String managerID = null;
     String amid = "ami-029abde7a909e7f6e";
     List<String> workersId = new ArrayList<>();
-//    String sqsUrl = awsHandler.createSqs("reviews");
-//    String sqsReturnUrl = awsHandler.createSqs("outputs");
-    String filessqsUrl = awsHandler.getSqsUrl("files");
+    String filessqsUrl = awsHandler.getSqsUrl("files.fifo");
     String inputsqsUrl = awsHandler.getSqsUrl("inputs");
     String outputsqsUrl = awsHandler.getSqsUrl("outputs");
     String answersUrlSqs = awsHandler.getSqsUrl("answers");
@@ -38,7 +31,7 @@ public static void main(String[] args) {
     String fullMessage = "";
 
     while (true) {
-        List<Message> files = awsHandler.readMessage(filessqsUrl,0);
+        List<Message> files = awsHandler.readMessage(filessqsUrl,10);
         if(files.isEmpty()){
             try {
                 Thread.sleep(1000);
@@ -53,8 +46,18 @@ public static void main(String[] args) {
         if(fullMessage.equals("t")){
             if(!workersId.isEmpty()) {
                 awsHandler.terminateInstances(workersId);
+                workersId.clear();
+                System.out.println(managerID);
+                awsHandler.terminateManager(managerID);
             }
             break;
+        }
+        else if(fullMessage.startsWith("managerID:")){
+            managerID = Local.extractFilenameAfterColon(fullMessage);
+            System.out.println("-------------------------------------------------------------------------");
+            System.out.println(managerID);
+            System.out.println("-------------------------------------------------------------------------");
+            continue;
         }
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonLocalMessage = null;
@@ -87,7 +90,7 @@ public static void main(String[] args) {
 
                     // If successful, process the JSON object
                     for (JsonNode review : jsonNode.findValue("reviews")) {
-                        awsHandler.sendMessage(review.toString(), inputsqsUrl);
+                        awsHandler.sendMessage(review.toString(), inputsqsUrl,null,null);
                         count++;
                     }
 
@@ -124,7 +127,7 @@ public static void main(String[] args) {
         awsHandler.uploadToBucket("worker-bucket-dsp", localId+":"+outputFile, outputFile);
         String summaryFilePath = awsHandler.getFileUrl("worker-bucket-dsp",localId+":"+outputFile);
         String json = String.format("{\"localId\":\"%s\" ,\"output file\":\"%s\" ,\"path\":\"%s\"}",localId,localId+":"+outputFile,summaryFilePath);
-        awsHandler.sendMessage(json,answersUrlSqs);
+        awsHandler.sendMessage(json,answersUrlSqs,null,null);
     }
 }
 

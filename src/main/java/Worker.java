@@ -66,7 +66,7 @@ public class Worker {
                         isSarcasm = true;
                     }
                     String responseJson = createResponseJson(revId,link,rank ,entities,isSarcasm);
-                    awsHandler.sendMessage(responseJson, outputsqsUrl);
+                    awsHandler.sendMessage(responseJson, outputsqsUrl,null,null);
 
                     // Clear the StringBuilder for the next JSON object
                     jsonStringBuilder.setLength(0);
