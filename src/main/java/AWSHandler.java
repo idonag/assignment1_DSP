@@ -1,8 +1,3 @@
-
-import com.amazonaws.services.cognitoidentity.model.Credentials;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
@@ -13,12 +8,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.*;
-import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 import java.io.*;
 
@@ -90,14 +81,14 @@ public class AWSHandler {
             System.out.println("ERROR "+e.getMessage());
         }
     }
-    public String getObjectFromBucket(String bucketName, String keyName, String path) {
+    public String getObjectFromBucket(String bucketName, String keyName) {
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(keyName)
                 .build();
         ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
         String fileName = new File(keyName).getName();
-        BufferedOutputStream outputStream = null;
+        BufferedOutputStream outputStream;
         try {
             outputStream = new BufferedOutputStream(new FileOutputStream(fileName));
 
@@ -250,4 +241,28 @@ public class AWSHandler {
         }
     }
 
+    public int runningInstances(List<String> workersId) {
+        if(workersId.isEmpty()){
+            return 0;
+        }
+        Filter stateFilter = Filter.builder()
+                .name("instance-state-name")
+                .values("running", "pending")
+                .build();
+
+        DescribeInstancesRequest describeInstancesRequest = DescribeInstancesRequest.builder()
+                .instanceIds(workersId)
+                .filters(stateFilter)
+                .build();
+
+        // Send the describe instances request and get the response
+        DescribeInstancesResponse describeInstancesResponse = ec2.describeInstances(describeInstancesRequest);
+        int count = 0;
+        for (Reservation reservation : describeInstancesResponse.reservations()) {
+            for (Instance instance : reservation.instances()) {
+                count++;
+            }
+        }
+        return count;
+    }
 }
