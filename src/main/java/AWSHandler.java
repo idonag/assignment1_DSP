@@ -1,8 +1,3 @@
-
-import com.amazonaws.services.cognitoidentity.model.Credentials;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
@@ -13,12 +8,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.*;
-import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 import java.io.*;
 
@@ -26,7 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class AWSHandler {
@@ -44,11 +37,11 @@ public class AWSHandler {
                 .imageId(amiId)
 
                 /*.iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())*/
-                .instanceType(InstanceType.T2_MEDIUM)
+                .instanceType(InstanceType.T2_LARGE)
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
                 .userData(Base64.getEncoder().encodeToString((userData).getBytes()))
-                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())
+                .iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::169611487111:instance-profile/LabInstanceProfile").build())
                 .build();
 
         RunInstancesResponse response = ec2.runInstances(runRequest);
@@ -88,14 +81,14 @@ public class AWSHandler {
             System.out.println("ERROR "+e.getMessage());
         }
     }
-    public String getObjectFromBucket(String bucketName, String keyName, String path) {
+    public String getObjectFromBucket(String bucketName, String keyName) {
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(keyName)
                 .build();
         ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
         String fileName = new File(keyName).getName();
-        BufferedOutputStream outputStream = null;
+        BufferedOutputStream outputStream;
         try {
             outputStream = new BufferedOutputStream(new FileOutputStream(fileName));
 
@@ -137,22 +130,45 @@ public class AWSHandler {
         return fileUrl;
     }
 
-    public String  createSqs(String name){
-        sqsClient.createQueue(CreateQueueRequest.builder().queueName(name).build());
+//    public String createSqs(String name){
+//        sqsClient.createQueue(CreateQueueRequest.builder().queueName(name).build());
+//        try {
+//            Thread.sleep(1000);
+//        }
+//        catch (Exception e){
+//            System.out.println("ERROR: "+e.getMessage());
+//        }
+//        String url = sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
+//        return url;
+//    }
+
+    public String createSqs(String name){
+        Map<QueueAttributeName, String> attributes = new HashMap<>();
+        if(name.endsWith(".fifo")){
+            attributes.put(QueueAttributeName.FIFO_QUEUE, "true");
+            attributes.put(QueueAttributeName.CONTENT_BASED_DEDUPLICATION, "false");
+        }
+        sqsClient.createQueue(CreateQueueRequest.builder().queueName(name).attributes(attributes).build());
         try {
             Thread.sleep(1000);
         }
         catch (Exception e){
             System.out.println("ERROR: "+e.getMessage());
         }
-        String url = sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
-        return url;
+        return sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
     }
     public String getSqsUrl(String name){
         return sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(name).build()).queueUrl();
     }
-    public void sendMessage(String m,String url){
-        SendMessageRequest sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url).build();
+    public void sendMessage(String m,String url,String messageGroupId,String messageDeduplicationId){
+        SendMessageRequest sendMessageRequest;
+        if(messageGroupId == null && messageDeduplicationId == null) {
+            sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url).build();
+        }
+        else{
+            sendMessageRequest = SendMessageRequest.builder().messageBody(m).queueUrl(url)
+                    .messageGroupId(messageGroupId).messageDeduplicationId(messageDeduplicationId).build();
+        }
         sqsClient.sendMessage(sendMessageRequest);
     }
     public List<Message> readMessage(String url,int visibilityTimeOut){
@@ -173,10 +189,14 @@ public class AWSHandler {
                 .values(tagName)
                 .build();
 
+        Filter stateFilter = Filter.builder()
+                .name("instance-state-name")
+                .values("running", "pending")
+                .build();
 
         // Create a describe instances request with the tag filter
         DescribeInstancesRequest describeInstancesRequest = DescribeInstancesRequest.builder()
-                .filters(tagFilter)
+                .filters(tagFilter,stateFilter)
                 .build();
 
         // Send the describe instances request and get the response
@@ -186,7 +206,7 @@ public class AWSHandler {
         for (Reservation reservation : describeInstancesResponse.reservations()) {
             for (Instance instance : reservation.instances()) {
                 for (Tag tag : instance.tags()) {
-                    if (tagName.equals(tag.value()) && "running".equals(instance.state().nameAsString())) {
+                    if (tagName.equals(tag.value())) {
                         return true; // Found an instance with the specified tag
                     }
                 }
@@ -201,4 +221,48 @@ public class AWSHandler {
         ec2.terminateInstances(terminateInstancesRequest);
     }
 
+    public void terminateManager(String id){
+        try {
+        // Terminate the instance
+        TerminateInstancesRequest request = TerminateInstancesRequest.builder()
+                .instanceIds(id)
+                .build();
+
+        TerminateInstancesResponse response  = ec2.terminateInstances(request);
+
+        System.out.println("Termination successful: " + response);
+        } catch (Exception e) {
+            System.err.println("Error terminating instance: " + e.getMessage());
+        } finally {
+            // Close the EC2 client
+            ec2.close();
+            s3Client.close();
+            sqsClient.close();
+        }
+    }
+
+    public int runningInstances(List<String> workersId) {
+        if(workersId.isEmpty()){
+            return 0;
+        }
+        Filter stateFilter = Filter.builder()
+                .name("instance-state-name")
+                .values("running", "pending")
+                .build();
+
+        DescribeInstancesRequest describeInstancesRequest = DescribeInstancesRequest.builder()
+                .instanceIds(workersId)
+                .filters(stateFilter)
+                .build();
+
+        // Send the describe instances request and get the response
+        DescribeInstancesResponse describeInstancesResponse = ec2.describeInstances(describeInstancesRequest);
+        int count = 0;
+        for (Reservation reservation : describeInstancesResponse.reservations()) {
+            for (Instance instance : reservation.instances()) {
+                count++;
+            }
+        }
+        return count;
+    }
 }
