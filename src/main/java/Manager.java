@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -169,9 +170,11 @@ public static void handleFile(AWSHandler awsHandler,String fullMessage,Object cr
     int numOfInstances = Math.min(8,numOfInstancesRequested);
     synchronized(createWorkersKey){
         int existsInstances = awsHandler.runningInstances(workersId);
+        System.out.println("exist: " + existsInstances);
+        System.out.println("num: " + numOfInstances);
         if(existsInstances < numOfInstances) {
             System.out.println("creating workers");
-            List<String> temp = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/worker.jar\n java -Xmx2g -jar worker.jar", "worker", amid, numOfInstances - existsInstances);
+            List<String> temp = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/worker.jar\nwhile true; do java -Xmx4g -jar worker.jar; done\n", "worker", amid, numOfInstances - existsInstances);
             workersId.addAll(temp);
         }
     }

@@ -64,7 +64,7 @@ public class Local {
     public static void initManager(AWSHandler awsHandler,String amid,String filesUrlSqs,String messageGroupId){
         if(!awsHandler.isInstanceWithTagExists("manager0")) {
             List<String> ids = awsHandler.createEC2Instance("#!/bin/bash\ncd usr/bin/\nmkdir dsp_files\ncd dsp_files\nwget https://worker-bucket-dsp.s3.amazonaws.com/manager.jar\n" +
-                    "java -Xmx2g -jar manager.jar\n", "manager", amid, 1);
+                    "while true; do java -Xmx4g -jar manager.jar; done\n", "manager", amid, 1);
             awsHandler.sendMessage("managerID:" + ids.get(0),filesUrlSqs,messageGroupId,"managerID");
         }
     }

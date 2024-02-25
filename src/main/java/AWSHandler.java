@@ -37,7 +37,7 @@ public class AWSHandler {
                 .imageId(amiId)
 
                 /*.iamInstanceProfile(IamInstanceProfileSpecification.builder().arn("arn:aws:iam::340758636980:instance-profile/LabInstanceProfile").build())*/
-                .instanceType(InstanceType.T2_MEDIUM)
+                .instanceType(InstanceType.T2_LARGE)
                 .maxCount(numOfInstances)
                 .minCount(numOfInstances)
                 .userData(Base64.getEncoder().encodeToString((userData).getBytes()))
